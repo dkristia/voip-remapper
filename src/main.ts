@@ -1,44 +1,9 @@
 import HID from 'node-hid';
 import robot from 'robotjs';
+import fs from 'fs';
 
-const VENDOR_ID = 0x6993;
-const PRODUCT_ID = 0xB700;
-
-const PREFIX = 0x81;
-const REMAP: { [key: string]: string } = {
-    "0D": "left",
-    "12": "up",
-    "04": "right",
-    "0E": "down",
-    "03": "accept",
-    "08": "back",
-    "09": "menu",
-    "00": "1",
-    "01": "2",
-    "02": "3",
-    "05": "4",
-    "06": "5",
-    "07": "6",
-    "0A": "7",
-    "0B": "8",
-    "0C": "9",
-    "0F": "star",
-    "10": "0",
-    "11": "hash",
-};
-
-const KEYCODES: { [key: string]: string } = {
-    "up": "f16",
-    "down": "f17",
-    "left": "f18",
-    "right": "f19",
-    "accept": "f20",
-    "back": "f21",
-    "menu": "f22",
-}
-
-function sendKeyEvent(action: string) {
-    const key = KEYCODES[action];
+function sendKeyEvent(action: string, keycodes: { [key: string]: string }) {
+    const key = keycodes[action];
     if (key) {
         robot.keyTap(key);
     }
@@ -46,8 +11,11 @@ function sendKeyEvent(action: string) {
 
 function main() {
     try {
+        const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
         const devices = HID.devices();
-        const deviceInfo = devices.find(d => d.vendorId === VENDOR_ID && d.productId === PRODUCT_ID);
+        const deviceInfo = devices.find(d => d.vendorId === Number(settings.VENDOR_ID) && d.productId === Number(settings.PRODUCT_ID));
+
+        const prefix = Number(settings.PREFIX);
 
         if (!deviceInfo) {
             console.error("Device not found");
@@ -57,12 +25,12 @@ function main() {
         const device = new HID.HID(deviceInfo.path || '');
 
         device.on('data', (data) => {
-            if (data[0] === PREFIX) {
+            if (data[0] === prefix) {
                 const buttonCode = data[1].toString(16).padStart(2, '0').toUpperCase();
-                const action = REMAP[buttonCode];
+                const action = settings.REMAP[buttonCode];
                 if (action) {
                     console.log(`Detected action: ${action}`);
-                    sendKeyEvent(action);
+                    sendKeyEvent(action, settings.KEYCODES);
                 } else if (buttonCode === "FF") {
                     // Ignore the FF code
                 }
